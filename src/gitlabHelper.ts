@@ -116,7 +116,7 @@ export class GitlabHelper {
    */
   async getAttachment(relurl: string) {
     try {
-      const attachmentUrl = this.host + '/' + this.projectPath + relurl;
+      const attachmentUrl = encodeURI(this.host + '/' + this.projectPath + relurl);
       const data = (
         await axios.get(encodeURI(attachmentUrl), {
           responseType: 'arraybuffer',
