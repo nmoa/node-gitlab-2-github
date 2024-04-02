@@ -49,6 +49,7 @@ export interface MilestoneImport {
 export interface SimpleLabel {
   name: string;
   color: string;
+  description: string;
 }
 
 export interface SimpleMilestone {
@@ -60,7 +61,9 @@ export class GithubHelper {
   githubApi: GitHubApi;
   githubUrl: string;
   githubOwner: string;
+  githubOwnerIsOrg: boolean;
   githubToken: string;
+  githubTokenOwner: string;
   githubRepo: string;
   githubTimeout?: number;
   gitlabHelper: GitlabHelper;
@@ -80,7 +83,9 @@ export class GithubHelper {
       ? githubSettings.baseUrl
       : gitHubLocation;
     this.githubOwner = githubSettings.owner;
+    this.githubOwnerIsOrg = githubSettings.ownerIsOrg ?? false;
     this.githubToken = githubSettings.token;
+    this.githubTokenOwner = githubSettings.token_owner;
     this.githubRepo = githubSettings.repo;
     this.githubTimeout = githubSettings.timeout;
     this.gitlabHelper = gitlabHelper;
@@ -154,6 +159,7 @@ export class GithubHelper {
         owner: this.githubOwner,
         repo: this.githubRepo,
         state: 'all',
+        labels: 'gitlab merge request',
         per_page: perPage,
         page: page,
       });
@@ -317,7 +323,7 @@ export class GithubHelper {
     let props: RestEndpointMethodTypes['repos']['update']['parameters'] = {
       owner: this.githubOwner,
       repo: this.githubRepo,
-      description: description.replace(/\s+/g, ' '),
+      description: description?.replace(/\s+/g, ' ') || '',
     };
     return this.githubApi.repos.update(props);
   }
@@ -347,7 +353,7 @@ export class GithubHelper {
 
     await utils.sleep(this.delayInMs);
 
-    if (settings.debug) return Promise.resolve({ data: issue });
+    if (settings.dryRun) return Promise.resolve({ data: issue });
 
     return this.githubApi.issues.create(props);
   }
@@ -448,7 +454,7 @@ export class GithubHelper {
     props.milestone = this.convertMilestone(issue);
     props.labels = this.convertLabels(issue);
 
-    if (settings.debug) return Promise.resolve({ data: issue });
+    if (settings.dryRun) return Promise.resolve({ data: issue });
 
     //
     // Issue comments
@@ -670,7 +676,7 @@ export class GithubHelper {
 
     await utils.sleep(this.delayInMs);
 
-    if (settings.debug) return true;
+    if (settings.dryRun) return true;
 
     await this.githubApi.issues
       .createComment({
@@ -705,7 +711,7 @@ export class GithubHelper {
 
     await utils.sleep(this.delayInMs);
 
-    if (settings.debug) return Promise.resolve();
+    if (settings.dryRun) return Promise.resolve();
 
     return await this.githubApi.issues.update(props);
   }
@@ -740,7 +746,7 @@ export class GithubHelper {
 
     await utils.sleep(this.delayInMs);
 
-    if (settings.debug) return Promise.resolve({ number: -1, title: 'DEBUG' });
+    if (settings.dryRun) return Promise.resolve({ number: -1, title: 'DEBUG' });
 
     const created = await this.githubApi.issues.createMilestone(
       githubMilestone
@@ -761,11 +767,12 @@ export class GithubHelper {
       repo: this.githubRepo,
       name: label.name,
       color: label.color.substring(1), // remove leading "#" because gitlab returns it but github wants the color without it
+      description: label.description,
     };
 
     await utils.sleep(this.delayInMs);
 
-    if (settings.debug) return Promise.resolve();
+    if (settings.dryRun) return Promise.resolve();
     // create the GitHub label
     return await this.githubApi.issues.createLabel(githubLabel);
   }
@@ -863,7 +870,7 @@ export class GithubHelper {
       }
     }
 
-    if (settings.debug) return Promise.resolve({ data: mergeRequest });
+    if (settings.dryRun) return Promise.resolve({ data: mergeRequest });
 
     if (canCreate) {
       let bodyConverted = await this.convertIssuesAndComments(
@@ -885,8 +892,8 @@ export class GithubHelper {
 
       try {
         // try to create the GitHub pull request from the GitLab issue
-        await this.githubApi.pulls.create(props);
-        return Promise.resolve({ data: null }); // need to return null promise for parent to wait on
+        const response = await this.githubApi.pulls.create(props);
+        return Promise.resolve(response);
       } catch (err) {
         if (err.status === 422) {
           console.error(
@@ -1048,7 +1055,7 @@ export class GithubHelper {
     if (
       mergeRequest.state === 'merged' &&
       pullRequest.state !== 'closed' &&
-      !settings.debug
+      !settings.dryRun
     ) {
       // Merging the pull request adds new commits to the tree; to avoid that, just close the merge requests
       mergeRequest.state = 'closed';
@@ -1067,7 +1074,7 @@ export class GithubHelper {
 
     await utils.sleep(this.delayInMs);
 
-    if (settings.debug) {
+    if (settings.dryRun) {
       return Promise.resolve();
     }
 
@@ -1398,11 +1405,20 @@ export class GithubHelper {
       else console.error(`\n\tSomething went wrong: ${err}.`);
     }
     try {
-      console.log(`Creating repo ${params.owner}/${params.repo}...`);
-      await this.githubApi.repos.createForAuthenticatedUser({
-        name: this.githubRepo,
-        private: true,
-      });
+      if (this.githubOwnerIsOrg) {
+        console.log(`Creating repo in organisation ${this.githubOwner}/${this.githubRepo}...`);
+        await this.githubApi.repos.createInOrg({
+          org: this.githubOwner,
+          name: this.githubRepo,
+          private: true,
+        });
+      } else {
+        console.log(`Creating repo ${this.githubTokenOwner}/${this.githubRepo}...`);
+        await this.githubApi.repos.createForAuthenticatedUser({
+          name: this.githubRepo,
+          private: true,
+        });
+      }
       console.log('\t...done.');
     } catch (err) {
       console.error(`\n\tSomething went wrong: ${err}.`);

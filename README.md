@@ -40,6 +40,34 @@ The user must be a member of the project you want to copy. This user must be the
 1. edit settings.ts
 1. run `npm run start`
 
+### Docker
+
+If you don't have Node.js installed in your local environment and don't want to install it you can use the Dockerized approach.
+
+1. Make sure that you have [Docker](https://docs.docker.com/engine/install/) installed in your computer. You can test running `docker version` in the terminal.
+1. `cp sample_settings.ts settings.ts`
+1. edit settings.ts
+1. `docker build -t node-gitlab-2-github:latest .`, or, you can use `make build-image`
+1. `docker run node-gitlab-2-github:latest`, or, you can use `make docker-run`
+
+If you want to let it run in the background (detached mode), just use the following command:
+
+1. `docker run -d node-gitlab-2-github:latest`
+
+### Docker with bind mounts
+
+In order to optimize the usage of the dockerized application, one can use the `bind mounts` feature of Docker ([Docker docs](https://docs.docker.com/storage/bind-mounts/)). This way, whenever you change the `settings.ts` file in the host environment it will change in the container filesystem as well.
+
+The process to use this trick is pretty much the same we presented before, the only different is the addition of a flag in the docker command to tell it what is the directory/file to be bound.
+
+1. Make sure that you have [Docker](https://docs.docker.com/engine/install/) installed in your computer. You can test running `docker version` in the terminal.
+1. `cp sample_settings.ts settings.ts`
+1. edit settings.ts
+1. `docker build -t node-gitlab-2-github:latest .`, or, you can use `make build-image`
+1. This command must work for **Linux** or **Mac**: `docker run --mount type=bind,source="$(pwd)/settings.ts",target="/app/settings.ts",readonly node-gitlab-2-github:latest`, or, you can use `make docker-run-bind`
+
+* If you want to run this last command in the Windows environment, please consult the Docker documentation on how to solve the problem of the pwd command expanding incorrectly there - [Docker documentation - Topics for windows](https://docs.docker.com/desktop/troubleshoot/topics/#topics-for-windows).
+
 ## Where to find info for the `settings.ts`
 
 ### gitlab
@@ -50,11 +78,15 @@ The URL under which your gitlab instance is hosted. Default is the official `htt
 
 #### gitlab.token
 
-Go to [Settings / Access Tokens](https://gitlab.com/profile/personal_access_tokens). Create a new Access Token with `api` and `read_repository` scopes and copy that into the `settings.ts`
+Go to [Settings / Access Tokens](https://gitlab.com/-/profile/personal_access_tokens). Create a new Access Token with `api` and `read_repository` scopes and copy that into the `settings.ts`
 
 #### gitlab.projectID
 
 Leave it null for the first run of the script. Then the script will show you which projects there are. Can be either string or number.
+
+#### gitlab.listArchivedProjects
+
+When listing projects on the first run (projectID = null), include archived ones too. The default is *true*.
 
 #### gitlab.sessionCookie
 
@@ -74,6 +106,10 @@ Point this to the api. The default is `api.github.com`.
 
 Under which organisation or user will the new project be hosted
 
+#### github.ownerIsOrg
+
+A boolean indicator (default is *false*) to specify that the owner of this repo is an Organisation.
+
 #### github.token
 
 Go to [Settings / Developer settings / Personal access tokens](https://github.com/settings/tokens). Generate a new token with `repo` scope and copy that into the `settings.ts`
@@ -90,6 +126,8 @@ What is the name of the new repo
 
 If true (default is false), we will try to delete the destination github repository if present, and (re)create it. The github token must be granted `delete_repo` scope. The newly created repository will be made private by default.
 
+If you've set `github.recreateRepo` to true and the repo belongs to an Organisation, the `github.ownerIsOrg` flag **must** be set as true.
+
 This is useful when debugging this tool or a specific migration. You will always be prompted for confirmation.
 
 ### s3 (optional)
@@ -105,6 +143,10 @@ IAM User who owns these credential must have [write permissions](https://docs.aw
 #### s3.bucket
 
 Existing bucket, with an appropriate security policy. One possible policy is to allow [public access](https://docs.aws.amazon.com/AmazonS3/latest/dev/WebsiteAccessPermissionsReqd.html).
+
+#### s3.region
+
+Specify Region (example: us-west-1) of bucket [list of regions](https://docs.aws.amazon.com/general/latest/gr/s3.html)
 
 ### usermap
 
@@ -144,7 +186,7 @@ If this is set to true (default) then the migration process will transfer releas
 Note that github api for releases is limited and hence this will only transfer the title and description of the releases
 and add them to github in chronological order, but it would not preserve the original release dates, nor transfer artefacts or assets.
 
-### debug
+### dryRun
 
 As default it is set to false. Doesn't fire the requests to github api and only does the work on the gitlab side to test for wonky cases before using up api-calls
 
