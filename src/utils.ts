@@ -73,11 +73,6 @@ export const migrateAttachments = async (
           });
         });
       };
-      if(s3.overrideURL){
-        // replace the attachment URL base with the configured value
-        // potentially useful if attachments are being stored in something other than S3...
-        s3url = `${s3.overrideURL}/${relativePath}${s3.overrideSuffix}`;
-      };
       if(s3.keepLocal){
         // keep a local copy of the attachment file
         let localFile = `attachments/${relativePath}`;
@@ -95,7 +90,17 @@ export const migrateAttachments = async (
       offsetToAttachment[
         match.index as number
       ] = `${prefix}[${name}](${s3url})`;
-    } else {
+    } 
+    else if(s3 && s3.overrideURL){
+        // replace the attachment URL base with the configured value
+        // potentially useful if attachments are being stored in something other than S3...
+        const overriddenUrl = `${s3.overrideURL}/${url}${s3.overrideSuffix}`.replace(/\/{2,}/g, '/');
+        // Add the new URL to the map
+        offsetToAttachment[
+          match.index as number
+        ] = `${prefix}[${name}](${overriddenUrl})`;
+      }
+    else {
       // Not using S3: default to old URL, adding absolute path
       const host = gitlabHelper.host.endsWith('/')
         ? gitlabHelper.host
