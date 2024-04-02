@@ -336,7 +336,7 @@ async function transferMilestones(usePlaceholders: boolean) {
  */
 async function transferLabels(attachmentLabel = true, useLowerCase = true) {
   inform('Transferring Labels');
-  console.warn(CCWARN,'NOTE (2022): GitHub descriptions are limited to 100 characters, and do not accept 4-byte Unicode');
+  console.warn(CCWARN, 'NOTE (2022): GitHub descriptions are limited to 100 characters, and do not accept 4-byte Unicode');
 
   const invalidUnicode = /[\u{10000}-\u{10FFFF}]|(?![*#0-9]+)[\p{Emoji}\p{Emoji_Modifier}\p{Emoji_Component}\p{Emoji_Modifier_Base}\p{Emoji_Presentation}]/gu;
 
@@ -375,19 +375,19 @@ async function transferLabels(attachmentLabel = true, useLowerCase = true) {
 
       if (label.description) {
         if (label.description.match(invalidUnicode)) {
-          console.warn(CCWARN,`⚠️ Removed invalid unicode characters from description.`);
+          console.warn(CCWARN, `⚠️ Removed invalid unicode characters from description.`);
           const cleanedDescription = label.description.replace(invalidUnicode, '').trim();
           console.debug(` "${label.description}"\n\t to\n "${cleanedDescription}"`);
           label.description = cleanedDescription;
         }
         if (label.description.length > 100) {
-          const trimmedDescription = label.description.slice(0,100).trim();
+          const trimmedDescription = label.description.slice(0, 100).trim();
           if (settings.trimOversizedLabelDescriptions) {
-            console.warn(CCWARN,`⚠️ Description too long (${label.description.length}), it was trimmed:`);
+            console.warn(CCWARN, `⚠️ Description too long (${label.description.length}), it was trimmed:`);
             console.debug(` "${label.description}"\n\t to\n "${trimmedDescription}"`);
             label.description = trimmedDescription;
           } else {
-            console.warn(CCWARN,`⚠️ Description too long (${label.description.length}), it was excluded.`);
+            console.warn(CCWARN, `⚠️ Description too long (${label.description.length}), it was excluded.`);
             console.debug(` "${label.description}"`);
             label.description = '';
           }
@@ -396,7 +396,7 @@ async function transferLabels(attachmentLabel = true, useLowerCase = true) {
 
       try {
         // process asynchronous code in sequence
-        await githubHelper.createLabel(label).catch(x => {});
+        await githubHelper.createLabel(label).catch(x => { });
       } catch (err) {
         console.error('Could not create label', label.name);
         console.error(err);
@@ -588,18 +588,12 @@ async function transferMergeRequests() {
     } else {
       if (githubRequest) {
         console.log(
-          'Gitlab merge request already exists (as github pull request): ' +
-            mr.iid +
-            ' - ' +
-            mr.title
+          `Gitlab merge request already exists (as github pull request #${githubRequest.number}): ${mr.iid} - ${mr.title}`
         );
         githubHelper.updatePullRequestState(githubRequest, mr);
       } else {
         console.log(
-          'Gitlab merge request already exists (as github issue): ' +
-            mr.iid +
-            ' - ' +
-            mr.title
+          `Gitlab merge request already exists (as github issue #${githubIssue.number}): ${mr.iid} - ${mr.title}`
         );
       }
     }
@@ -650,18 +644,18 @@ async function transferReleases() {
       } catch (err) {
         console.error(
           'Could not create release: !' +
-            release.name +
-            ' - ' +
-            release.tag_name
+          release.name +
+          ' - ' +
+          release.tag_name
         );
         console.error(err);
       }
     } else {
       console.log(
         'Gitlab release already exists (as github release): ' +
-          githubRelease.data.name +
-          ' - ' +
-          githubRelease.data.tag_name
+        githubRelease.data.name +
+        ' - ' +
+        githubRelease.data.tag_name
       );
     }
   }
@@ -722,5 +716,5 @@ function inform(msg: string) {
 }
 
 function escapeRegExp(string) {
-   return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // $& means the whole matched string
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // $& means the whole matched string
 }
