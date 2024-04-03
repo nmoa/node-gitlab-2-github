@@ -759,12 +759,12 @@ async function updateIssues() {
   console.log(numberMappings);
 
   for (let issue of githubIssues) {
-    console.log(`Updating issue #${issue.number}...`);
     // Replace GitLab merge request numbers with GitHub issue numbers
+    console.log(`Updating issue #${issue.number}...`);
     issue.body = issue.body.replace(/!([0-9]+)/g, (match, number) => {
       for (const mapping of numberMappings) {
         if (Number(number) === mapping.gitlab) {
-          console.log(`Replacing GitLab MR number !${mapping.gitlab} with GitHub issue number #${mapping.github}`);
+          console.log(`Replacing GitLab MR !${mapping.gitlab} with GitHub issue #${mapping.github}`);
           return `#${mapping.github} `;
         }
       }
