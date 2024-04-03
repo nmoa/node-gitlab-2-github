@@ -358,6 +358,17 @@ export class GithubHelper {
     return this.githubApi.issues.create(props);
   }
 
+  async updateIssue(issue: GitHubIssue) {
+    let props: RestEndpointMethodTypes['issues']['update']['parameters'] = {
+      owner: this.githubOwner,
+      repo: this.githubRepo,
+      issue_number: issue.number,
+      body: issue.body,
+    };
+
+    return this.githubApi.issues.update(props);
+  }
+
   /**
    * Converts GitLab assignees to GitHub usernames, using settings.usermap
    */
