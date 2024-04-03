@@ -225,6 +225,11 @@ async function migrate() {
         await transferMergeRequests();
       }
     }
+
+    if (settings.transfer.convertMrNumbers){
+      await updateIssues();
+    }
+
   } catch (err) {
     console.error('Error during transfer:');
     console.error(err);
@@ -731,6 +736,43 @@ async function logMergeRequests(logFile: string) {
 }
 
 // ----------------------------------------------------------------------------
+
+async function updateIssues() {
+  inform('Updating Issues');
+
+  // Get a list of all pull requests (merge request equivalent) associated with
+  // this project
+  let mergeRequests = await gitlabApi.MergeRequests.all({
+    projectId: settings.gitlab.projectId,
+    labels: settings.filterByLabel,
+  });
+  mergeRequests = mergeRequests.sort((a, b) => a.iid - b.iid);
+
+  // get a list of the current issues and PRs in the new GitHub repo (likely to be empty)
+  let githubIssues = await githubHelper.getAllGithubIssues();
+  let githubPullRequests = await githubHelper.getAllGithubPullRequests();
+
+  // get a list of number mappings from GitLab to GitHub
+  const numberMappings = mergeRequests.map(mr => findMatchingGitHubNumber(mr, githubPullRequests, githubIssues)).filter(i => i);
+  
+  console.log("Convert GitLab MR numbers to GitHub issue numbers with the following mappings:");
+  console.log(numberMappings);
+
+  for (let issue of githubIssues) {
+    console.log(`Updating issue #${issue.number}...`);
+    // Replace GitLab merge request numbers with GitHub issue numbers
+    issue.body = issue.body.replace(/!([0-9]+)/g, (match, number) => {
+      for (const mapping of numberMappings) {
+        if (Number(number) === mapping.gitlab) {
+          console.log(`Replacing GitLab MR number !${mapping.gitlab} with GitHub issue number #${mapping.github}`);
+          return `#${mapping.github} `;
+        }
+      }
+      return match;
+    });
+    githubHelper.updateIssue(issue);
+  }
+}
 
 /**
  * Print out a section heading to let the user know what is happening

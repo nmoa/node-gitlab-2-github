@@ -18,6 +18,7 @@ export default interface Settings {
     issues: boolean;
     mergeRequests: boolean;
     releases: boolean;
+    convertMrNumbers: boolean;
   };
   useIssueImportAPI: boolean;
   usePlaceholderMilestonesForMissingMilestones: boolean;
