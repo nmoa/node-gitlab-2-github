@@ -159,7 +159,6 @@ export class GithubHelper {
         owner: this.githubOwner,
         repo: this.githubRepo,
         state: 'all',
-        labels: 'gitlab merge request',
         per_page: perPage,
         page: page,
       });
