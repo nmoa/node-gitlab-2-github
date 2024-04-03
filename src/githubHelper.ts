@@ -1252,16 +1252,16 @@ export class GithubHelper {
       );
     }
     // Replace: %"Milestone"
-    reString = '(?<=\\W)%"(.*?)"';
-    str = str.replace(new RegExp(reString, 'g'), (_, p1) =>
-      milestoneReplacer('', p1)
-    );
+    // reString = '(?<=\\W)%"(.*?)"';
+    // str = str.replace(new RegExp(reString, 'g'), (_, p1) =>
+    //   milestoneReplacer('', p1)
+    // );
 
     // Replace: %nn
-    reString = '(?<=\\W)%(\\d+)';
-    str = str.replace(new RegExp(reString, 'g'), (_, p1) =>
-      milestoneReplacer(p1, '')
-    );
+    // reString = '(?<=\\W)%(\\d+)';
+    // str = str.replace(new RegExp(reString, 'g'), (_, p1) =>
+    //   milestoneReplacer(p1, '')
+    // );
 
     //
     // Label reference conversion
