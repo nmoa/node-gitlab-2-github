@@ -4,7 +4,7 @@ import {
   SimpleLabel,
   SimpleMilestone,
 } from './githubHelper';
-import { GitlabHelper, GitLabIssue, GitLabMilestone } from './gitlabHelper';
+import { GitlabHelper, GitLabIssue, GitLabMergeRequest, GitLabMilestone } from './gitlabHelper';
 import settings from '../settings';
 
 import { Octokit as GitHubApi } from '@octokit/rest';
@@ -15,6 +15,7 @@ import { default as readlineSync } from 'readline-sync';
 import * as fs from 'fs';
 
 import AWS from 'aws-sdk';
+import { AnyLengthString } from 'aws-sdk/clients/comprehendmedical';
 
 const CCERROR = '\x1b[31m%s\x1b[0m'; // red
 const CCWARN = '\x1b[33m%s\x1b[0m'; // yellow
@@ -515,6 +516,29 @@ async function transferIssues() {
 }
 // ----------------------------------------------------------------------------
 
+function findMatchingGitHubNumber(mergeRequest: GitLabMergeRequest, 
+  githubPullRequests: any[], githubIssues: any[]) {
+    let githubRequest = githubPullRequests.find(
+      i => i.title.trim() === mergeRequest.title.trim()
+    );
+    let githubIssue = githubIssues.find(
+      // allow for issues titled "Original Issue Name - [merged|closed]"
+      i => {
+        // regex needs escaping in case merge request title contains special characters
+        const regex = new RegExp(escapeRegExp(mergeRequest.title.trim()) + ' - \\[(merged|closed)\\]');
+        return regex.test(i.title.trim());
+      }
+    );
+    if (!githubRequest && !githubIssue) {
+      return null;
+    }
+    const githubNumber = githubRequest ? githubRequest.number : (githubIssue ? githubIssue.number : null);
+    return {
+      "gitlab" : mergeRequest.iid,
+      "github" : githubNumber
+    };
+}
+
 /**
  * Transfer any merge requests that exist in GitLab that do not exist in GitHub
  * TODO - Update all text references to use the new issue numbers;
@@ -547,6 +571,8 @@ async function transferMergeRequests() {
   console.log(
     'Transferring ' + mergeRequests.length.toString() + ' merge requests'
   );
+  
+  const numberMappings = mergeRequests.map(mr => findMatchingGitHubNumber(mr, githubPullRequests, githubIssues)).filter(i => i);
 
   //
   // Create GitHub pull request for each GitLab merge request
