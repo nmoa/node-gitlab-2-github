@@ -76,7 +76,7 @@ const githubApi = new MyOctokit({
       console.log(`Retrying after ${retryAfter} seconds!`);
       return true;
     },
-    onAbuseLimit: async (retryAfter, options) => {
+    onSecondaryRateLimit: async (retryAfter, options) => {
       console.log(
         `Abuse detected for request ${options.method} ${options.url}`
       );
