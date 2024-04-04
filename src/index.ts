@@ -4,7 +4,7 @@ import {
   SimpleLabel,
   SimpleMilestone,
 } from './githubHelper';
-import { GitlabHelper, GitLabIssue, GitLabMilestone } from './gitlabHelper';
+import { GitlabHelper, GitLabIssue, GitLabMergeRequest, GitLabMilestone } from './gitlabHelper';
 import settings from '../settings';
 
 import { Octokit as GitHubApi } from '@octokit/rest';
@@ -15,6 +15,7 @@ import { default as readlineSync } from 'readline-sync';
 import * as fs from 'fs';
 
 import AWS from 'aws-sdk';
+import { AnyLengthString } from 'aws-sdk/clients/comprehendmedical';
 
 const CCERROR = '\x1b[31m%s\x1b[0m'; // red
 const CCWARN = '\x1b[33m%s\x1b[0m'; // yellow
@@ -75,7 +76,7 @@ const githubApi = new MyOctokit({
       console.log(`Retrying after ${retryAfter} seconds!`);
       return true;
     },
-    onAbuseLimit: async (retryAfter, options) => {
+    onSecondaryRateLimit: async (retryAfter, options) => {
       console.log(
         `Abuse detected for request ${options.method} ${options.url}`
       );
@@ -224,6 +225,11 @@ async function migrate() {
         await transferMergeRequests();
       }
     }
+
+    if (settings.transfer.convertMrNumbers){
+      await updateIssues();
+    }
+
   } catch (err) {
     console.error('Error during transfer:');
     console.error(err);
@@ -336,7 +342,7 @@ async function transferMilestones(usePlaceholders: boolean) {
  */
 async function transferLabels(attachmentLabel = true, useLowerCase = true) {
   inform('Transferring Labels');
-  console.warn(CCWARN,'NOTE (2022): GitHub descriptions are limited to 100 characters, and do not accept 4-byte Unicode');
+  console.warn(CCWARN, 'NOTE (2022): GitHub descriptions are limited to 100 characters, and do not accept 4-byte Unicode');
 
   const invalidUnicode = /[\u{10000}-\u{10FFFF}]|(?![*#0-9]+)[\p{Emoji}\p{Emoji_Modifier}\p{Emoji_Component}\p{Emoji_Modifier_Base}\p{Emoji_Presentation}]/gu;
 
@@ -375,19 +381,19 @@ async function transferLabels(attachmentLabel = true, useLowerCase = true) {
 
       if (label.description) {
         if (label.description.match(invalidUnicode)) {
-          console.warn(CCWARN,`⚠️ Removed invalid unicode characters from description.`);
+          console.warn(CCWARN, `⚠️ Removed invalid unicode characters from description.`);
           const cleanedDescription = label.description.replace(invalidUnicode, '').trim();
           console.debug(` "${label.description}"\n\t to\n "${cleanedDescription}"`);
           label.description = cleanedDescription;
         }
         if (label.description.length > 100) {
-          const trimmedDescription = label.description.slice(0,100).trim();
+          const trimmedDescription = label.description.slice(0, 100).trim();
           if (settings.trimOversizedLabelDescriptions) {
-            console.warn(CCWARN,`⚠️ Description too long (${label.description.length}), it was trimmed:`);
+            console.warn(CCWARN, `⚠️ Description too long (${label.description.length}), it was trimmed:`);
             console.debug(` "${label.description}"\n\t to\n "${trimmedDescription}"`);
             label.description = trimmedDescription;
           } else {
-            console.warn(CCWARN,`⚠️ Description too long (${label.description.length}), it was excluded.`);
+            console.warn(CCWARN, `⚠️ Description too long (${label.description.length}), it was excluded.`);
             console.debug(` "${label.description}"`);
             label.description = '';
           }
@@ -396,7 +402,7 @@ async function transferLabels(attachmentLabel = true, useLowerCase = true) {
 
       try {
         // process asynchronous code in sequence
-        await githubHelper.createLabel(label).catch(x => {});
+        await githubHelper.createLabel(label).catch(x => { });
       } catch (err) {
         console.error('Could not create label', label.name);
         console.error(err);
@@ -515,6 +521,29 @@ async function transferIssues() {
 }
 // ----------------------------------------------------------------------------
 
+function findMatchingGitHubNumber(mergeRequest: GitLabMergeRequest, 
+  githubPullRequests: any[], githubIssues: any[]) {
+    let githubRequest = githubPullRequests.find(
+      i => i.title.trim() === mergeRequest.title.trim()
+    );
+    let githubIssue = githubIssues.find(
+      // allow for issues titled "Original Issue Name - [merged|closed]"
+      i => {
+        // regex needs escaping in case merge request title contains special characters
+        const regex = new RegExp(escapeRegExp(mergeRequest.title.trim()) + ' - \\[(merged|closed)\\]');
+        return regex.test(i.title.trim());
+      }
+    );
+    if (!githubRequest && !githubIssue) {
+      return null;
+    }
+    const githubNumber = githubRequest ? githubRequest.number : (githubIssue ? githubIssue.number : null);
+    return {
+      "gitlab" : mergeRequest.iid,
+      "github" : githubNumber
+    };
+}
+
 /**
  * Transfer any merge requests that exist in GitLab that do not exist in GitHub
  * TODO - Update all text references to use the new issue numbers;
@@ -547,6 +576,8 @@ async function transferMergeRequests() {
   console.log(
     'Transferring ' + mergeRequests.length.toString() + ' merge requests'
   );
+  
+  const numberMappings = mergeRequests.map(mr => findMatchingGitHubNumber(mr, githubPullRequests, githubIssues)).filter(i => i);
 
   //
   // Create GitHub pull request for each GitLab merge request
@@ -588,18 +619,12 @@ async function transferMergeRequests() {
     } else {
       if (githubRequest) {
         console.log(
-          'Gitlab merge request already exists (as github pull request): ' +
-            mr.iid +
-            ' - ' +
-            mr.title
+          `Gitlab merge request already exists (as github pull request #${githubRequest.number}): ${mr.iid} - ${mr.title}`
         );
         githubHelper.updatePullRequestState(githubRequest, mr);
       } else {
         console.log(
-          'Gitlab merge request already exists (as github issue): ' +
-            mr.iid +
-            ' - ' +
-            mr.title
+          `Gitlab merge request already exists (as github issue #${githubIssue.number}): ${mr.iid} - ${mr.title}`
         );
       }
     }
@@ -650,18 +675,18 @@ async function transferReleases() {
       } catch (err) {
         console.error(
           'Could not create release: !' +
-            release.name +
-            ' - ' +
-            release.tag_name
+          release.name +
+          ' - ' +
+          release.tag_name
         );
         console.error(err);
       }
     } else {
       console.log(
         'Gitlab release already exists (as github release): ' +
-          githubRelease.data.name +
-          ' - ' +
-          githubRelease.data.tag_name
+        githubRelease.data.name +
+        ' - ' +
+        githubRelease.data.tag_name
       );
     }
   }
@@ -712,6 +737,50 @@ async function logMergeRequests(logFile: string) {
 
 // ----------------------------------------------------------------------------
 
+async function updateIssues() {
+  inform('Updating Issues');
+
+  // Get a list of all pull requests (merge request equivalent) associated with
+  // this project
+  let mergeRequests = await gitlabApi.MergeRequests.all({
+    projectId: settings.gitlab.projectId,
+    labels: settings.filterByLabel,
+  });
+  mergeRequests = mergeRequests.sort((a, b) => a.iid - b.iid);
+
+  // get a list of the current issues and PRs in the new GitHub repo (likely to be empty)
+  let githubIssues = await githubHelper.getAllGithubIssues();
+  let githubPullRequests = await githubHelper.getAllGithubPullRequests();
+
+  // get a list of number mappings from GitLab to GitHub
+  const numberMappings = mergeRequests.map(mr => findMatchingGitHubNumber(mr, githubPullRequests, githubIssues)).filter(i => i);
+  
+  console.log("Convert GitLab MR numbers to GitHub issue numbers with the following mappings:");
+  console.log(numberMappings);
+
+  for (let issue of githubIssues) {
+    // Replace GitLab merge request numbers with GitHub issue numbers
+    console.log(`Updating issue #${issue.number}...`);
+    issue.body = issue.body.replace(/!([0-9]+)/g, (match, number) => {
+      for (const mapping of numberMappings) {
+        if (Number(number) === mapping.gitlab) {
+          console.log(`Replacing GitLab MR !${mapping.gitlab} with GitHub issue #${mapping.github}`);
+          return `#${mapping.github} `;
+        }
+      }
+      return match;
+    });
+    
+    // Replace issue numbers like "MyGroup/project#123" with "OwnerName/project#123"
+    const reString = settings.gitlab.group ? `${settings.gitlab.group}/([a-zA-Z\\-]+)#(\\d+)` : `([a-zA-Z\\-]+)#(\\d+)`;
+    issue.body = issue.body.replace(new RegExp(reString, 'g'), (match, project, number) => {
+      console.log(`Replacing ${match} with ${settings.github.owner}/${project}#${number}`);
+      return ` ${settings.github.owner}/${project}#${number}`;
+    });
+    githubHelper.updateIssue(issue);
+  }
+}
+
 /**
  * Print out a section heading to let the user know what is happening
  */
@@ -722,5 +791,5 @@ function inform(msg: string) {
 }
 
 function escapeRegExp(string) {
-   return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // $& means the whole matched string
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // $& means the whole matched string
 }

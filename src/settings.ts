@@ -18,6 +18,7 @@ export default interface Settings {
     issues: boolean;
     mergeRequests: boolean;
     releases: boolean;
+    convertMrNumbers: boolean;
   };
   useIssueImportAPI: boolean;
   usePlaceholderMilestonesForMissingMilestones: boolean;
@@ -50,6 +51,7 @@ export interface GithubSettings {
 
 export interface GitlabSettings {
   url?: string;
+  group?: string;
   token: string;
   projectId: number;
   listArchivedProjects?: boolean;
@@ -57,6 +59,10 @@ export interface GitlabSettings {
 }
 
 export interface S3Settings {
+  useS3: boolean;
+  keepLocal: boolean;
+  overrideURL: string;
+  overrideSuffix: string;
   accessKeyId: string;
   secretAccessKey: string;
   bucket: string;

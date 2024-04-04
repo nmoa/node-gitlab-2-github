@@ -159,7 +159,6 @@ export class GithubHelper {
         owner: this.githubOwner,
         repo: this.githubRepo,
         state: 'all',
-        labels: 'gitlab merge request',
         per_page: perPage,
         page: page,
       });
@@ -356,6 +355,17 @@ export class GithubHelper {
     if (settings.dryRun) return Promise.resolve({ data: issue });
 
     return this.githubApi.issues.create(props);
+  }
+
+  async updateIssue(issue: GitHubIssue) {
+    let props: RestEndpointMethodTypes['issues']['update']['parameters'] = {
+      owner: this.githubOwner,
+      repo: this.githubRepo,
+      issue_number: issue.number,
+      body: issue.body,
+    };
+
+    return this.githubApi.issues.update(props);
   }
 
   /**
@@ -1242,16 +1252,24 @@ export class GithubHelper {
       );
     }
     // Replace: %"Milestone"
-    reString = '(?<=\\W)%"(.*?)"';
-    str = str.replace(new RegExp(reString, 'g'), (_, p1) =>
-      milestoneReplacer('', p1)
-    );
+    // reString = '(?<=\\W)%"(.*?)"';
+    // str = str.replace(new RegExp(reString, 'g'), (_, p1) =>
+    //   milestoneReplacer('', p1)
+    // );
 
     // Replace: %nn
-    reString = '(?<=\\W)%(\\d+)';
-    str = str.replace(new RegExp(reString, 'g'), (_, p1) =>
-      milestoneReplacer(p1, '')
-    );
+    // reString = '(?<=\\W)%(\\d+)';
+    // str = str.replace(new RegExp(reString, 'g'), (_, p1) =>
+    //   milestoneReplacer(p1, '')
+    // );
+
+    // replace issue URL with issue number
+    reString = `${settings.gitlab.url}/.*?/issues/(\\d+)`;
+    str = str.replace(new RegExp(reString, 'g'), (_, p1) => `#${p1}`);
+
+    // replace merge request URL with MR number
+    reString = `${settings.gitlab.url}/.*?/merge_requests/(\\d+)`;
+    str = str.replace(new RegExp(reString, 'g'), (_, p1) => `!${p1}`);
 
     //
     // Label reference conversion
@@ -1322,14 +1340,14 @@ export class GithubHelper {
       dateformatOptions
     );
 
-    const attribution = `In GitLab by @${item.author.username} on ${formattedDate}`;
+    const attribution = `*On GitLab by @${item.author.username} on ${formattedDate}*`;
     const lineRef =
       item && item.position
         ? GithubHelper.createLineRef(item.position, repoLink)
         : '';
     const summary = attribution + (lineRef ? `\n\n${lineRef}` : '');
 
-    return `${summary}\n\n${str}`;
+    return `${summary}\n\n---\n\n${str}`;
   }
 
   /**

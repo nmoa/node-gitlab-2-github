@@ -5,10 +5,18 @@
   "version": "0.2.0",
   "configurations": [
     {
+      "command": "npm start",
+      "name": "Run npm start",
+      "request": "launch",
+      "type": "node-terminal"
+    },
+    {
       "type": "node",
       "request": "launch",
       "name": "Node: Launch",
-      "env": { "TS_NODE_PROJECT": "tsconfig.dev.json" },
+      "env": {
+        "TS_NODE_PROJECT": "tsconfig.dev.json"
+      },
       "runtimeExecutable": "node",
       "args": [
         "--inspect",
