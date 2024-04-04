@@ -1263,6 +1263,14 @@ export class GithubHelper {
     //   milestoneReplacer(p1, '')
     // );
 
+    // replace issue URL with issue number
+    reString = `${settings.gitlab.url}/.*?/issues/(\\d+)`;
+    str = str.replace(new RegExp(reString, 'g'), (_, p1) => `#${p1}`);
+
+    // replace merge request URL with MR number
+    reString = `${settings.gitlab.url}/.*?/merge_requests/(\\d+)`;
+    str = str.replace(new RegExp(reString, 'g'), (_, p1) => `!${p1}`);
+
     //
     // Label reference conversion
     //
