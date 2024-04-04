@@ -51,6 +51,7 @@ export interface GithubSettings {
 
 export interface GitlabSettings {
   url?: string;
+  group?: string;
   token: string;
   projectId: number;
   listArchivedProjects?: boolean;

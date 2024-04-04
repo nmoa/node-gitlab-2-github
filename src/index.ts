@@ -770,6 +770,13 @@ async function updateIssues() {
       }
       return match;
     });
+    
+    // Replace issue numbers like "MyGroup/project#123" with "OwnerName/project#123"
+    const reString = settings.gitlab.group ? `${settings.gitlab.group}/([a-zA-Z\\-]+)#(\\d+)` : `([a-zA-Z\\-]+)#(\\d+)`;
+    issue.body = issue.body.replace(new RegExp(reString, 'g'), (match, project, number) => {
+      console.log(`Replacing ${match} with ${settings.github.owner}/${project}#${number}`);
+      return ` ${settings.github.owner}/${project}#${number}`;
+    });
     githubHelper.updateIssue(issue);
   }
 }
